@@ -1,0 +1,34 @@
+{
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	},
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "pingme-sales",
+					"appId": "1:274692726692:android:6b941f97e30a31f8736b31",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"ios": {
+				"default": {
+					"projectId": "pingme-sales",
+					"appId": "1:274692726692:ios:6b941f97e30a31f8736b31",
+					"uploadDebugSymbols": false,
+					"fileOutput": "ios/Runner/GoogleService-Info.plist"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "pingme-sales",
+					"configurations": {
+						"android": "1:274692726692:android:6b941f97e30a31f8736b31",
+						"ios": "1:274692726692:ios:6b941f97e30a31f8736b31"
+					}
+				}
+			}
+		}
+	}
+}
