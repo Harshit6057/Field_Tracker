@@ -8,12 +8,14 @@ class SessionState {
     this.employeeId,
     this.employeeName,
     this.employeePhone,
+    this.adminName,
   });
 
   final UserRole role;
   final String? employeeId;
   final String? employeeName;
   final String? employeePhone;
+  final String? adminName;
 
   static const loggedOut = SessionState(role: UserRole.none);
 }
@@ -21,8 +23,11 @@ class SessionState {
 class SessionNotifier extends StateNotifier<SessionState> {
   SessionNotifier() : super(SessionState.loggedOut);
 
-  void loginAsAdmin() {
-    state = const SessionState(role: UserRole.admin);
+  void loginAsAdmin({required String adminName}) {
+    state = SessionState(
+      role: UserRole.admin,
+      adminName: adminName,
+    );
   }
 
   void loginAsEmployee({

@@ -14,8 +14,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isAdmin = false;
   final _employeeNameController = TextEditingController();
-  final _employeePhoneController = TextEditingController();
-  final _adminPasscodeController = TextEditingController();
+  final _employeePhoneController = TextEditingController();  final _adminNameController = TextEditingController();  final _adminPasscodeController = TextEditingController();
   String? _error;
   bool _isSubmitting = false;
 
@@ -23,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _employeeNameController.dispose();
     _employeePhoneController.dispose();
+    _adminNameController.dispose();
     _adminPasscodeController.dispose();
     super.dispose();
   }
@@ -67,6 +67,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (_isAdmin) ...[
+                        TextField(
+                          controller: _adminNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Admin name',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         TextField(
                           controller: _adminPasscodeController,
                           obscureText: true,
@@ -124,6 +132,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       if (_isAdmin) {
+        final adminName = _adminNameController.text.trim();
+        if (adminName.isEmpty) {
+          setState(() {
+            _error = 'Admin name is required.';
+          });
+          return;
+        }
         final isValid = await repository.validateAdminPassword(
           _adminPasscodeController.text.trim(),
         );
@@ -133,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           });
           return;
         }
-        sessionNotifier.loginAsAdmin();
+        sessionNotifier.loginAsAdmin(adminName: adminName);
         return;
       }
 

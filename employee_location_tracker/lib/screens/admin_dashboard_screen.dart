@@ -26,6 +26,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(sessionProvider);
     final employeesAsync = ref.watch(employeeStatusesProvider);
 
     return Scaffold(
@@ -116,7 +117,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     employeeId: selectedEmployee.employeeId,
                     title: 'Chat: ${selectedEmployee.employeeName}',
                     senderRole: ChatSenderRole.admin,
-                    senderName: 'Admin',
+                    senderName: session.adminName ?? 'Admin',
                   ),
                 ),
               );
