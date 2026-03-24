@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Any authenticated app user (including anonymous auth) can manage files.
+    // Tighten path-level restrictions before production hardening.
+    match /{allPaths=**} {
+      allow read, write: if request.auth.uid != null;
+    }
+  }
+}

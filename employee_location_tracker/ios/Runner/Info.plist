@@ -32,6 +32,12 @@
 	<string>Background location is needed for complete route visibility after check-in.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Location is needed to track employee movement during office hours.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is needed to capture visit photos for reporting.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is needed if you choose an existing visit photo.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Photo access is used to attach visit evidence photos to reports.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

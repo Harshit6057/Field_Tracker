@@ -6,6 +6,7 @@ import '../core/app_config.dart';
 import '../models/app_user.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
+import '../models/visit_evidence.dart';
 import '../repositories/firebase_tracking_repository.dart';
 import '../repositories/mock_tracking_repository.dart';
 import '../repositories/tracking_repository.dart';
@@ -176,4 +177,10 @@ final employeeRouteProvider =
 		StreamProvider.family<List<RoutePoint>, String>((ref, employeeId) {
 	final repository = ref.watch(trackingRepositoryProvider);
 	return repository.watchTodayRoute(employeeId);
+});
+
+final employeeVisitEvidenceProvider =
+		StreamProvider.family<List<VisitEvidence>, String>((ref, employeeId) {
+	final repository = ref.watch(trackingRepositoryProvider);
+	return repository.watchVisitEvidence(employeeId);
 });
