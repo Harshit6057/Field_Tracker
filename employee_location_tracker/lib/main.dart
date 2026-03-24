@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
@@ -69,3 +68,8 @@ class _BootstrapErrorApp extends StatelessWidget {
     );
   }
 }
+
+
+// *Get latest updates	git fetch tracker
+// *Apply updates	git merge tracker/main
+// *Push to your new repo	git push origin main
