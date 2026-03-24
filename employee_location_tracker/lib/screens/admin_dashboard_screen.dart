@@ -169,7 +169,7 @@ class _EmployeeList extends StatelessWidget {
   }
 }
 
-class _AdminMap extends StatelessWidget {
+class _AdminMap extends StatefulWidget {
   const _AdminMap({
     required this.employees,
     required this.selectedEmployeeId,
@@ -183,42 +183,66 @@ class _AdminMap extends StatelessWidget {
   final AsyncValue<List<VisitEvidence>> evidenceAsync;
 
   @override
+  State<_AdminMap> createState() => _AdminMapState();
+}
+
+class _AdminMapState extends State<_AdminMap> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final selectedEmployee = employees.firstWhere(
-      (employee) => employee.employeeId == selectedEmployeeId,
-      orElse: () => employees.first,
+    final selectedEmployee = widget.employees.firstWhere(
+      (employee) => employee.employeeId == widget.selectedEmployeeId,
+      orElse: () => widget.employees.first,
     );
 
-    final focus = points.isNotEmpty
-        ? ll.LatLng(points.last.latitude, points.last.longitude)
+    final focus = widget.points.isNotEmpty
+        ? ll.LatLng(widget.points.last.latitude, widget.points.last.longitude)
         : ll.LatLng(selectedEmployee.latitude ?? 28.6139, selectedEmployee.longitude ?? 77.2090);
 
-    final markers = employees
+    final markers = widget.employees
         .where((employee) => employee.latitude != null && employee.longitude != null)
         .map(
           (employee) => TrackerMapMarker(
             point: ll.LatLng(employee.latitude!, employee.longitude!),
-            color: employee.employeeId == selectedEmployeeId
+            color: employee.employeeId == widget.selectedEmployeeId
                 ? Colors.blue
                 : Colors.red,
           ),
         )
         .toList(growable: false);
 
-    final latestPoint = points.isNotEmpty ? points.last : null;
+    final latestPoint = widget.points.isNotEmpty ? widget.points.last : null;
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: Scrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
+        interactive: true,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             ListTile(
               title: Text('Route for ${selectedEmployee.employeeName}'),
               subtitle: Text(
                 'Distance: ${(selectedEmployee.totalDistanceMeters / 1000).toStringAsFixed(2)} km • '
-                'Points: ${points.length}',
+                'Points: ${widget.points.length}',
               ),
             ),
             const Divider(height: 1),
@@ -260,7 +284,7 @@ class _AdminMap extends StatelessWidget {
               child: TrackerMapWidget(
                 initialLatitude: focus.latitude,
                 initialLongitude: focus.longitude,
-                route: points
+                route: widget.points
                     .map((point) => ll.LatLng(point.latitude, point.longitude))
                     .toList(growable: false),
                 currentLatitude: latestPoint?.latitude,
@@ -269,15 +293,15 @@ class _AdminMap extends StatelessWidget {
                 autoFollowCurrentLocation: true,
               ),
             ),
-            if (points.isNotEmpty) const Divider(height: 1),
-            if (points.isNotEmpty)
+            if (widget.points.isNotEmpty) const Divider(height: 1),
+            if (widget.points.isNotEmpty)
               SizedBox(
                 height: 130,
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemBuilder: (context, index) {
-                    final reverseIndex = points.length - 1 - index;
-                    final point = points[reverseIndex];
+                    final reverseIndex = widget.points.length - 1 - index;
+                    final point = widget.points[reverseIndex];
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -296,7 +320,7 @@ class _AdminMap extends StatelessWidget {
                     );
                   },
                   separatorBuilder: (_, index) => const SizedBox(height: 6),
-                  itemCount: points.length > 12 ? 12 : points.length,
+                  itemCount: widget.points.length > 12 ? 12 : widget.points.length,
                 ),
               ),
             const Divider(height: 1),
@@ -312,13 +336,13 @@ class _AdminMap extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${evidenceAsync.asData?.value.length ?? 0} photo${(evidenceAsync.asData?.value.length ?? 0) != 1 ? 's' : ''}',
+                    '${widget.evidenceAsync.asData?.value.length ?? 0} photo${(widget.evidenceAsync.asData?.value.length ?? 0) != 1 ? 's' : ''}',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],
               ),
             ),
-            evidenceAsync.when(
+            widget.evidenceAsync.when(
               loading: () => const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(child: CircularProgressIndicator()),
@@ -359,7 +383,8 @@ class _AdminMap extends StatelessWidget {
                 );
               },
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
