@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
+import '../models/visit_evidence.dart';
 import 'tracking_repository.dart';
 
 class MockTrackingRepository implements TrackingRepository {
@@ -12,11 +14,14 @@ class MockTrackingRepository implements TrackingRepository {
 
   final Map<String, EmployeeStatus> _employees = {};
   final Map<String, List<RoutePoint>> _todayRoutes = {};
+  final Map<String, List<VisitEvidence>> _visitEvidence = {};
 
   final StreamController<List<EmployeeStatus>> _employeesController =
       StreamController<List<EmployeeStatus>>.broadcast();
   final Map<String, StreamController<EmployeeStatus?>> _employeeControllers = {};
   final Map<String, StreamController<List<RoutePoint>>> _routeControllers = {};
+  final Map<String, StreamController<List<VisitEvidence>>> _visitEvidenceControllers =
+      {};
 
   @override
   Future<EmployeeStatus> upsertEmployeeProfile({
@@ -75,6 +80,16 @@ class MockTrackingRepository implements TrackingRepository {
       () => StreamController<List<RoutePoint>>.broadcast(),
     );
     yield List.unmodifiable(_todayRoutes[employeeId] ?? []);
+    yield* controller.stream;
+  }
+
+  @override
+  Stream<List<VisitEvidence>> watchVisitEvidence(String employeeId) async* {
+    final controller = _visitEvidenceControllers.putIfAbsent(
+      employeeId,
+      () => StreamController<List<VisitEvidence>>.broadcast(),
+    );
+    yield List.unmodifiable(_visitEvidence[employeeId] ?? []);
     yield* controller.stream;
   }
 
@@ -195,6 +210,33 @@ class MockTrackingRepository implements TrackingRepository {
     _broadcast();
   }
 
+  @override
+  Future<void> addVisitEvidence({
+    required String employeeId,
+    required VisitEvidenceType type,
+    required String remarks,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+    required List<int> photoBytes,
+  }) async {
+    final evidence = VisitEvidence(
+      id: '${DateTime.now().microsecondsSinceEpoch}',
+      employeeId: employeeId,
+      timestamp: DateTime.now(),
+      latitude: latitude,
+      longitude: longitude,
+      locationName: locationName,
+      remarks: remarks,
+      type: type,
+      localPhotoBytes: Uint8List.fromList(photoBytes),
+    );
+
+    final list = _visitEvidence.putIfAbsent(employeeId, () => []);
+    list.insert(0, evidence);
+    _broadcast();
+  }
+
   void _broadcast() {
     _employeesController.add(_sortedEmployees());
 
@@ -203,6 +245,9 @@ class MockTrackingRepository implements TrackingRepository {
     }
     for (final entry in _routeControllers.entries) {
       entry.value.add(List.unmodifiable(_todayRoutes[entry.key] ?? []));
+    }
+    for (final entry in _visitEvidenceControllers.entries) {
+      entry.value.add(List.unmodifiable(_visitEvidence[entry.key] ?? []));
     }
   }
 

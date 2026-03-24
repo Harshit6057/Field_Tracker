@@ -1,5 +1,6 @@
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
+import '../models/visit_evidence.dart';
 
 abstract class TrackingRepository {
   Future<EmployeeStatus> upsertEmployeeProfile({
@@ -10,6 +11,7 @@ abstract class TrackingRepository {
   Stream<List<EmployeeStatus>> watchEmployees();
   Stream<EmployeeStatus?> watchEmployee(String employeeId);
   Stream<List<RoutePoint>> watchTodayRoute(String employeeId);
+  Stream<List<VisitEvidence>> watchVisitEvidence(String employeeId);
   Future<EmployeeStatus?> getEmployee(String employeeId);
   Future<void> checkIn({required String employeeId});
   Future<void> checkOut({required String employeeId});
@@ -22,4 +24,13 @@ abstract class TrackingRepository {
     double? accuracyMeters,
   });
   Future<void> updatePresence({required String employeeId, required bool isOnline});
+  Future<void> addVisitEvidence({
+    required String employeeId,
+    required VisitEvidenceType type,
+    required String remarks,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+    required List<int> photoBytes,
+  });
 }
