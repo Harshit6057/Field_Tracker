@@ -97,3 +97,8 @@ class _BootstrapErrorApp extends StatelessWidget {
     );
   }
 }
+
+
+// *Get latest updates	git fetch tracker
+// *Apply updates	git merge tracker/main
+// *Push to your new repo	git push origin main
