@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../core/app_config.dart';
 import '../models/app_user.dart';
+import '../models/chat_message.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
 import '../models/visit_evidence.dart';
@@ -183,4 +184,10 @@ final employeeVisitEvidenceProvider =
 		StreamProvider.family<List<VisitEvidence>, String>((ref, employeeId) {
 	final repository = ref.watch(trackingRepositoryProvider);
 	return repository.watchVisitEvidence(employeeId);
+});
+
+final employeeChatMessagesProvider =
+		StreamProvider.family<List<ChatMessage>, String>((ref, employeeId) {
+	final repository = ref.watch(trackingRepositoryProvider);
+	return repository.watchChatMessages(employeeId);
 });

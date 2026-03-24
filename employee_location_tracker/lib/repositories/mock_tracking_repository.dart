@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../models/chat_message.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
 import '../models/visit_evidence.dart';
@@ -15,6 +16,7 @@ class MockTrackingRepository implements TrackingRepository {
   final Map<String, EmployeeStatus> _employees = {};
   final Map<String, List<RoutePoint>> _todayRoutes = {};
   final Map<String, List<VisitEvidence>> _visitEvidence = {};
+  final Map<String, List<ChatMessage>> _chatMessages = {};
 
   final StreamController<List<EmployeeStatus>> _employeesController =
       StreamController<List<EmployeeStatus>>.broadcast();
@@ -22,6 +24,7 @@ class MockTrackingRepository implements TrackingRepository {
   final Map<String, StreamController<List<RoutePoint>>> _routeControllers = {};
   final Map<String, StreamController<List<VisitEvidence>>> _visitEvidenceControllers =
       {};
+  final Map<String, StreamController<List<ChatMessage>>> _chatControllers = {};
 
   @override
   Future<EmployeeStatus> upsertEmployeeProfile({
@@ -90,6 +93,16 @@ class MockTrackingRepository implements TrackingRepository {
       () => StreamController<List<VisitEvidence>>.broadcast(),
     );
     yield List.unmodifiable(_visitEvidence[employeeId] ?? []);
+    yield* controller.stream;
+  }
+
+  @override
+  Stream<List<ChatMessage>> watchChatMessages(String employeeId) async* {
+    final controller = _chatControllers.putIfAbsent(
+      employeeId,
+      () => StreamController<List<ChatMessage>>.broadcast(),
+    );
+    yield List.unmodifiable(_chatMessages[employeeId] ?? []);
     yield* controller.stream;
   }
 
@@ -237,6 +250,30 @@ class MockTrackingRepository implements TrackingRepository {
     _broadcast();
   }
 
+  @override
+  Future<void> sendChatMessage({
+    required String employeeId,
+    required ChatSenderRole senderRole,
+    required String text,
+    String? senderName,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    final list = _chatMessages.putIfAbsent(employeeId, () => []);
+    list.add(
+      ChatMessage(
+        id: '${DateTime.now().microsecondsSinceEpoch}',
+        employeeId: employeeId,
+        senderRole: senderRole,
+        text: trimmed,
+        senderName: senderName,
+        timestamp: DateTime.now(),
+      ),
+    );
+    _broadcast();
+  }
+
   void _broadcast() {
     _employeesController.add(_sortedEmployees());
 
@@ -248,6 +285,9 @@ class MockTrackingRepository implements TrackingRepository {
     }
     for (final entry in _visitEvidenceControllers.entries) {
       entry.value.add(List.unmodifiable(_visitEvidence[entry.key] ?? []));
+    }
+    for (final entry in _chatControllers.entries) {
+      entry.value.add(List.unmodifiable(_chatMessages[entry.key] ?? []));
     }
   }
 

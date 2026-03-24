@@ -6,9 +6,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
+import '../models/chat_message.dart';
 import '../models/visit_evidence.dart';
 import '../providers/session_provider.dart';
 import '../providers/tracking_provider.dart';
+import 'chat_screen.dart';
 import 'tracker_map_widget.dart';
 import '../widgets/location_name_text.dart';
 
@@ -97,6 +99,33 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             },
           );
         },
+      ),
+      floatingActionButton: employeesAsync.maybeWhen(
+        data: (employees) {
+          if (employees.isEmpty) return null;
+          final selectedId = _selectedEmployeeId ?? employees.first.employeeId;
+          final selectedEmployee = employees.firstWhere(
+            (employee) => employee.employeeId == selectedId,
+            orElse: () => employees.first,
+          );
+          return FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ChatScreen(
+                    employeeId: selectedEmployee.employeeId,
+                    title: 'Chat: ${selectedEmployee.employeeName}',
+                    senderRole: ChatSenderRole.admin,
+                    senderName: 'Admin',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Chat'),
+          );
+        },
+        orElse: () => null,
       ),
     );
   }

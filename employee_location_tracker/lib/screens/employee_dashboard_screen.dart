@@ -9,9 +9,11 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../models/route_point.dart';
+import '../models/chat_message.dart';
 import '../models/visit_evidence.dart';
 import '../providers/session_provider.dart';
 import '../providers/tracking_provider.dart';
+import 'chat_screen.dart';
 import 'tracker_map_widget.dart';
 import '../widgets/location_name_text.dart';
 
@@ -50,6 +52,22 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
       appBar: AppBar(
         title: Text('Employee - ${session.employeeName ?? session.employeePhone ?? 'Profile'}'),
         actions: [
+          IconButton(
+            tooltip: 'Chat with admin',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ChatScreen(
+                    employeeId: employeeId,
+                    title: 'Chat with Admin',
+                    senderRole: ChatSenderRole.employee,
+                    senderName: session.employeeName ?? 'Employee',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.chat_bubble_outline),
+          ),
           IconButton(
             tooltip: 'Logout',
             onPressed: () => ref.read(sessionProvider.notifier).logout(),

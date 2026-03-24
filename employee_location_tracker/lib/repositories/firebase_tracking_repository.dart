@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../models/chat_message.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
 import '../models/visit_evidence.dart';
@@ -81,6 +82,10 @@ class FirebaseTrackingRepository implements TrackingRepository {
     return _employeesRef.doc(employeeId).collection('visit_evidence');
   }
 
+  CollectionReference<Map<String, dynamic>> _chatMessagesRef(String employeeId) {
+    return _employeesRef.doc(employeeId).collection('chat_messages');
+  }
+
   @override
   Stream<List<EmployeeStatus>> watchEmployees() {
     return _employeesRef.snapshots().map((snapshot) {
@@ -117,6 +122,19 @@ class FirebaseTrackingRepository implements TrackingRepository {
         .map((snapshot) {
       return snapshot.docs
           .map((doc) => _visitEvidenceFromDoc(employeeId, doc))
+          .toList(growable: false);
+    });
+  }
+
+  @override
+  Stream<List<ChatMessage>> watchChatMessages(String employeeId) {
+    return _chatMessagesRef(employeeId)
+        .orderBy('timestamp', descending: false)
+        .limit(300)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => _chatMessageFromDoc(employeeId, doc))
           .toList(growable: false);
     });
   }
@@ -286,6 +304,25 @@ class FirebaseTrackingRepository implements TrackingRepository {
     });
   }
 
+  @override
+  Future<void> sendChatMessage({
+    required String employeeId,
+    required ChatSenderRole senderRole,
+    required String text,
+    String? senderName,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    await _chatMessagesRef(employeeId).add({
+      'employeeId': employeeId,
+      'senderRole': senderRole.name,
+      'senderName': senderName,
+      'text': trimmed,
+      'timestamp': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
   EmployeeStatus _employeeFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
 
@@ -340,6 +377,26 @@ class FirebaseTrackingRepository implements TrackingRepository {
       remarks: (data['remarks'] as String?) ?? '',
       type: type,
       photoUrl: data['photoUrl'] as String?,
+    );
+  }
+
+  ChatMessage _chatMessageFromDoc(
+    String employeeId,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final roleRaw = (data['senderRole'] as String?) ?? ChatSenderRole.employee.name;
+    final senderRole = roleRaw == ChatSenderRole.admin.name
+        ? ChatSenderRole.admin
+        : ChatSenderRole.employee;
+
+    return ChatMessage(
+      id: doc.id,
+      employeeId: employeeId,
+      senderRole: senderRole,
+      text: (data['text'] as String?) ?? '',
+      senderName: data['senderName'] as String?,
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 

@@ -1,3 +1,4 @@
+import '../models/chat_message.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
 import '../models/visit_evidence.dart';
@@ -12,6 +13,7 @@ abstract class TrackingRepository {
   Stream<EmployeeStatus?> watchEmployee(String employeeId);
   Stream<List<RoutePoint>> watchTodayRoute(String employeeId);
   Stream<List<VisitEvidence>> watchVisitEvidence(String employeeId);
+  Stream<List<ChatMessage>> watchChatMessages(String employeeId);
   Future<EmployeeStatus?> getEmployee(String employeeId);
   Future<void> checkIn({required String employeeId});
   Future<void> checkOut({required String employeeId});
@@ -32,5 +34,11 @@ abstract class TrackingRepository {
     required double longitude,
     required String locationName,
     required List<int> photoBytes,
+  });
+  Future<void> sendChatMessage({
+    required String employeeId,
+    required ChatSenderRole senderRole,
+    required String text,
+    String? senderName,
   });
 }
