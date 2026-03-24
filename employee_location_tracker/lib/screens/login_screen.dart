@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../providers/session_provider.dart';
 import '../providers/tracking_provider.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -14,7 +16,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isAdmin = false;
   final _employeeNameController = TextEditingController();
-  final _employeePhoneController = TextEditingController();  final _adminNameController = TextEditingController();  final _adminPasscodeController = TextEditingController();
+  final _employeePhoneController = TextEditingController();
+  final _adminNameController = TextEditingController();
+  final _adminPasscodeController = TextEditingController();
   String? _error;
   bool _isSubmitting = false;
 
@@ -97,6 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
                             labelText: 'Employee phone number',
+                            hintText: '10-digit phone or +91XXXXXXXXXX',
                             border: OutlineInputBorder(),
                           ),
                         ),
@@ -161,16 +166,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
-      final employee = await repository.upsertEmployeeProfile(
-        employeeName: employeeName,
-        phoneNumber: phoneNumber,
-      );
-
-      sessionNotifier.loginAsEmployee(
-        employeeId: employee.employeeId,
-        employeeName: employee.employeeName,
-        employeePhone: employee.phoneNumber ?? phoneNumber,
-      );
+      // Send OTP via Firebase
+      await _sendOtp(employeeName, phoneNumber);
     } catch (error) {
       setState(() {
         _error = error.toString();
@@ -182,5 +179,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         });
       }
     }
+  }
+
+  Future<void> _sendOtp(String employeeName, String phoneNumber) async {
+    try {
+      // Format phone number with country code if not already present
+      String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: formattedPhone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification (only works on Android with Google Play Services)
+          await _completeEmployeeLogin(employeeName, phoneNumber);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            setState(() {
+              _error = e.message ?? 'Phone verification failed.';
+            });
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (mounted) {
+            _navigateToOtpScreen(employeeName, phoneNumber, verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (_) {},
+        timeout: const Duration(seconds: 120),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to send OTP: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  Future<void> _completeEmployeeLogin(
+    String employeeName,
+    String phoneNumber,
+  ) async {
+    final repository = ref.read(trackingRepositoryProvider);
+    final sessionNotifier = ref.read(sessionProvider.notifier);
+
+    try {
+      // Firebase authentication successful, now create/update employee profile
+      final employee = await repository.upsertEmployeeProfile(
+        employeeName: employeeName,
+        phoneNumber: phoneNumber,
+      );
+
+      sessionNotifier.loginAsEmployee(
+        employeeId: employee.employeeId,
+        employeeName: employee.employeeName,
+        employeePhone: employee.phoneNumber ?? phoneNumber,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to complete login: ${error.toString()}';
+        });
+      }
+    }
+  }
+
+  void _navigateToOtpScreen(
+    String employeeName,
+    String phoneNumber,
+    String verificationId,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => OtpVerificationScreen(
+          phoneNumber: phoneNumber,
+          employeeName: employeeName,
+          verificationId: verificationId,
+          onVerified: (UserCredential credential) async {
+            // OTP verified, complete employee login
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+            await _completeEmployeeLogin(employeeName, phoneNumber);
+          },
+          onResendOtp: () async {
+            // Resend OTP
+            await _sendOtp(employeeName, phoneNumber);
+          },
+        ),
+      ),
+    );
   }
 }
