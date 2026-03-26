@@ -180,3 +180,7 @@ class _ChatBubble extends StatelessWidget {
     );
   }
 }
+
+
+
+

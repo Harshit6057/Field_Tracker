@@ -75,7 +75,7 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,9 +127,36 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
                     if (controllerState.error != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          controllerState.error!,
-                          style: const TextStyle(color: Colors.red),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              controllerState.error!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                            if (controllerState.error!
+                                .toLowerCase()
+                                .contains('location permissions are not granted'))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () => Geolocator.openAppSettings(),
+                                      icon: const Icon(Icons.settings_outlined),
+                                      label: const Text('Open App Settings'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () => Geolocator.openLocationSettings(),
+                                      icon: const Icon(Icons.location_on_outlined),
+                                      label: const Text('Open Location Settings'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     const SizedBox(height: 12),
@@ -159,48 +186,42 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
               ),
             ),
             const SizedBox(height: 12),
-            Expanded(
+            SizedBox(
+              height: 240,
+              child: routeAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(child: Text(error.toString())),
+                data: (points) => _EmployeeRouteMap(points: points),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 320,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    flex: 5,
-                    child: routeAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (error, _) => Center(child: Text(error.toString())),
-                      data: (points) => _EmployeeRouteMap(points: points),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    flex: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 0, 8),
+                    child: Row(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 0, 8),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.photo_camera_back_outlined, size: 18),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Visit Evidence',
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                              const Spacer(),
-                              if (visitEvidenceAsync.asData?.value.isNotEmpty ??
-                                  false)
-                                Text(
-                                  '${visitEvidenceAsync.asData?.value.length ?? 0} photos',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                            ],
+                        const Icon(Icons.photo_camera_back_outlined, size: 18),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Visit Evidence',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        if (visitEvidenceAsync.asData?.value.isNotEmpty ??
+                            false)
+                          Text(
+                            '${visitEvidenceAsync.asData?.value.length ?? 0} photos',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        ),
-                        Expanded(
-                          child: _VisitEvidencePanel(evidenceAsync: visitEvidenceAsync),
-                        ),
                       ],
                     ),
+                  ),
+                  Expanded(
+                    child: _VisitEvidencePanel(evidenceAsync: visitEvidenceAsync),
                   ),
                 ],
               ),
@@ -568,16 +589,21 @@ class _LocationReadout extends StatelessWidget {
   }
 }
 
-class _VisitEvidencePanel extends StatelessWidget {
+class _VisitEvidencePanel extends StatefulWidget {
   const _VisitEvidencePanel({required this.evidenceAsync});
 
   final AsyncValue<List<VisitEvidence>> evidenceAsync;
 
   @override
+  State<_VisitEvidencePanel> createState() => _VisitEvidencePanelState();
+}
+
+class _VisitEvidencePanelState extends State<_VisitEvidencePanel> {
+  @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: evidenceAsync.when(
+      child: widget.evidenceAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Padding(

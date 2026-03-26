@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,9 +18,31 @@ Future<void> main() async {
   String? bootstrapError;
   if (!AppConfig.useMockBackend) {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(const Duration(seconds: 12));
+      if (Firebase.apps.isEmpty) {
+        try {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          ).timeout(const Duration(seconds: 12));
+        } on FirebaseException catch (error) {
+          if (error.code != 'duplicate-app') {
+            rethrow;
+          }
+        }
+      }
+
+      if (!kDebugMode) {
+        try {
+          await FirebaseAppCheck.instance
+              .activate(
+                providerAndroid: const AndroidPlayIntegrityProvider(),
+                providerApple:
+                    const AppleAppAttestWithDeviceCheckFallbackProvider(),
+              )
+              .timeout(const Duration(seconds: 12));
+        } catch (_) {
+          // Keep app startup resilient when App Check is not configured yet.
+        }
+      }
 
       // Firestore rules commonly require request.auth; ensure every device has
       // a Firebase user session before the first read/write.
@@ -84,7 +108,7 @@ class _BootstrapErrorApp extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'The app could not finish initializing. Check iOS signing, Firebase setup, and network, then relaunch.',
+                    'The app could not finish initializing. Check Firebase setup and network, then relaunch.',
                   ),
                   const SizedBox(height: 12),
                   SelectableText(errorMessage),
@@ -97,8 +121,3 @@ class _BootstrapErrorApp extends StatelessWidget {
     );
   }
 }
-
-
-// *Get latest updates	git fetch tracker
-// *Apply updates	git merge tracker/main
-// *Push to your new repo	git push origin main

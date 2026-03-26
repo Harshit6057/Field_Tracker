@@ -195,7 +195,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         verificationFailed: (FirebaseAuthException e) {
           if (mounted) {
             setState(() {
-              _error = e.message ?? 'Phone verification failed.';
+              final message = e.message ?? 'Phone verification failed.';
+              if (message.toLowerCase().contains('missing a valid app identifier')) {
+                _error = 'Phone auth blocked by app verification. Add SHA-1 and SHA-256 for com.example.sales_tracking_app in Firebase Android app settings, then download latest google-services.json and retry.';
+              } else {
+                _error = message;
+              }
             });
           }
         },
@@ -248,6 +253,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     String employeeName,
     String phoneNumber,
     String verificationId,
+    {bool useDebugFallback = false}
   ) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -255,6 +261,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           phoneNumber: phoneNumber,
           employeeName: employeeName,
           verificationId: verificationId,
+          useDebugFallback: useDebugFallback,
+          onDebugVerified: useDebugFallback
+              ? () => _completeEmployeeLogin(employeeName, phoneNumber)
+              : null,
           onVerified: (UserCredential credential) async {
             // OTP verified, complete employee login
             if (mounted) {
