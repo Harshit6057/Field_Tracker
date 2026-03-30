@@ -169,7 +169,7 @@ class _ChatBubble extends StatelessWidget {
                 Text(message.text),
                 const SizedBox(height: 4),
                 Text(
-                  DateFormat('dd MMM, HH:mm').format(message.timestamp),
+                  DateFormat('dd MMM, hh:mm a').format(message.timestamp),
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ],

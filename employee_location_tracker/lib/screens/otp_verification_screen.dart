@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 import 'dart:async';
-
-const _debugOtpCode = '123456';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
@@ -14,17 +12,13 @@ class OtpVerificationScreen extends StatefulWidget {
     required this.verificationId,
     required this.onVerified,
     required this.onResendOtp,
-    this.useDebugFallback = false,
-    this.onDebugVerified,
   });
 
   final String phoneNumber;
   final String employeeName;
   final String verificationId;
-  final Function(UserCredential) onVerified;
-  final Future<void> Function() onResendOtp;
-  final bool useDebugFallback;
-  final Future<void> Function()? onDebugVerified;
+  final Future<void> Function() onVerified;
+  final Future<String> Function() onResendOtp;
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -38,11 +32,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
   bool _canResend = false;
   int _resendCountdown = 60;
   String _otp = '';
+  late String _verificationId;
   Timer? _resendTimer;
 
   @override
   void initState() {
     super.initState();
+    _verificationId = widget.verificationId;
     _startResendCountdown();
     listenForCode();
   }
@@ -97,8 +93,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => !_isVerifying,
+    return PopScope(
+      canPop: !_isVerifying,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Verify Phone Number'),
@@ -122,9 +118,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          widget.useDebugFallback
-                              ? 'Debug mode: enter $_debugOtpCode to continue.'
-                              : 'Enter the 6-digit OTP sent to ${widget.phoneNumber}',
+                          'Enter the 6-digit OTP sent to ${widget.phoneNumber}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 28),
@@ -145,12 +139,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                                Icon(Icons.error_outline,
+                                    color: Colors.red.shade700, size: 20),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     _error!,
-                                    style: TextStyle(color: Colors.red.shade700),
+                                    style:
+                                        TextStyle(color: Colors.red.shade700),
                                   ),
                                 ),
                               ],
@@ -176,14 +172,27 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
                           onPressed: _canResend && !_isVerifying
                               ? () async {
                                   try {
-                                    await widget.onResendOtp();
+                                    final nextVerificationId = await widget.onResendOtp();
                                     if (!mounted) return;
+                                    _verificationId = nextVerificationId;
                                     _startResendCountdown();
                                     listenForCode();
-                                  } catch (_) {
+                                    setState(() {
+                                      _error = null;
+                                    });
+                                    // Clear OTP fields
+                                    for (var controller in _otpDigitControllers) {
+                                      controller.clear();
+                                    }
+                                    _updateOtp();
+                                  } catch (e) {
                                     if (!mounted) return;
                                     setState(() {
-                                      _error = 'Unable to resend OTP. Please try again.';
+                                      if (e is FirebaseAuthException) {
+                                        _error = _mapOtpError(e);
+                                      } else {
+                                        _error = 'Failed to resend OTP. Please try again.';
+                                      }
                                     });
                                   }
                                 }
@@ -293,47 +302,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
       _error = null;
     });
 
-    if (widget.useDebugFallback) {
-      if (otp == _debugOtpCode) {
-        try {
-          await widget.onDebugVerified?.call();
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-        } catch (_) {
-          if (mounted) {
-            setState(() {
-              _error = 'Unable to complete debug sign-in. Please try again.';
-              _isVerifying = false;
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _error = 'Invalid OTP. Use $_debugOtpCode in debug mode.';
-            _isVerifying = false;
-          });
-        }
-      }
-      return;
-    }
-
     try {
       final credential = PhoneAuthProvider.credential(
-        verificationId: widget.verificationId,
+        verificationId: _verificationId,
         smsCode: otp,
       );
+      await FirebaseAuth.instance.signInWithCredential(credential);
 
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      
       if (mounted) {
-        widget.onVerified(userCredential);
+        await widget.onVerified();
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message ?? 'Invalid OTP. Please try again.';
+          _error = _mapOtpError(e);
           _isVerifying = false;
         });
       }
@@ -344,6 +326,27 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> with Code
           _isVerifying = false;
         });
       }
+    }
+  }
+
+  String _mapOtpError(FirebaseAuthException e) {
+    final message = (e.message ?? '').toLowerCase();
+
+    if (message.contains('17006') || message.contains('sms unable to be sent until this region enabled')) {
+      return 'SMS OTP is blocked for this region in Firebase. Ask admin to allow your region in SMS region policy.';
+    }
+
+    switch (e.code) {
+      case 'invalid-verification-code':
+        return 'Invalid OTP code. Please re-check and enter again.';
+      case 'session-expired':
+        return 'OTP expired. Please tap Resend OTP and try again.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a few minutes before retrying.';
+      case 'captcha-check-failed':
+        return 'App verification failed. Configure reCAPTCHA Enterprise in Firebase.';
+      default:
+        return e.message ?? 'Verification failed. Please try again.';
     }
   }
 }

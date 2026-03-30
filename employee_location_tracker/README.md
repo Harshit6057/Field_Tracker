@@ -21,9 +21,13 @@ Professional mobile app for employee attendance and route tracking with separate
 
 ## Demo Credentials (Mock Mode)
 
-- Admin passcode: `admin123`
 - Sample employee IDs: `EMP001`, `EMP002`
 - Any employee name can be used at login
+- For admin login in mock mode, pass a secure value at runtime:
+
+	```bash
+	flutter run --dart-define=MOCK_ADMIN_PASSCODE=<your-strong-passcode>
+	```
 
 ## Setup
 
@@ -35,13 +39,13 @@ Professional mobile app for employee attendance and route tracking with separate
 
 2. Add Google Maps API key:
 
-	- Android: update `android/app/src/main/AndroidManifest.xml`
-	- iOS: update `ios/Runner/Info.plist` key `GoogleMapsApiKey`
+	- Android: set `MAPS_API_KEY` via `android/gradle.properties`, environment variable, or CI secret.
+	- iOS: update `ios/Runner/Info.plist` key `GoogleMapsApiKey`.
 
 3. Run the app:
 
 	```bash
-	flutter run
+	flutter run --dart-define=FIREBASE_API_KEY=<your-firebase-api-key>
 	```
 
 ## Production Notes

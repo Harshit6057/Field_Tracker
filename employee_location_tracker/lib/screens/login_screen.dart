@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -166,9 +168,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
-      // Send OTP via Firebase
-      await _sendOtp(employeeName, phoneNumber);
+      final formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+      final verificationId = await _requestOtp(
+        employeeName: employeeName,
+        phoneNumber: formattedPhone,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _navigateToOtpScreen(
+        employeeName,
+        formattedPhone,
+        verificationId,
+      );
     } catch (error) {
+      if (error == 'AUTO_VERIFIED') {
+        return;
+      }
       setState(() {
         _error = error.toString();
       });
@@ -181,43 +199,72 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _sendOtp(String employeeName, String phoneNumber) async {
-    try {
-      // Format phone number with country code if not already present
-      String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+  Future<String> _requestOtp({
+    required String employeeName,
+    required String phoneNumber,
+    int? forceResendingToken,
+  }) async {
+    final completer = Completer<String>();
 
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: formattedPhone,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-verification (only works on Android with Google Play Services)
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      forceResendingToken: forceResendingToken,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        if (completer.isCompleted) {
+          return;
+        }
+
+        try {
+          await FirebaseAuth.instance.signInWithCredential(credential);
           await _completeEmployeeLogin(employeeName, phoneNumber);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          if (mounted) {
-            setState(() {
-              final message = e.message ?? 'Phone verification failed.';
-              if (message.toLowerCase().contains('missing a valid app identifier')) {
-                _error = 'Phone auth blocked by app verification. Add SHA-1 and SHA-256 for com.example.sales_tracking_app in Firebase Android app settings, then download latest google-services.json and retry.';
-              } else {
-                _error = message;
-              }
-            });
-          }
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          if (mounted) {
-            _navigateToOtpScreen(employeeName, phoneNumber, verificationId);
-          }
-        },
-        codeAutoRetrievalTimeout: (_) {},
-        timeout: const Duration(seconds: 120),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to send OTP: ${e.toString()}';
-        });
-      }
+          completer.completeError('AUTO_VERIFIED');
+        } catch (e) {
+          completer.completeError(e);
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (completer.isCompleted) {
+          return;
+        }
+        completer.completeError(_mapPhoneAuthError(e));
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        if (completer.isCompleted) {
+          return;
+        }
+        completer.complete(verificationId);
+      },
+      codeAutoRetrievalTimeout: (_) {},
+    );
+
+    return completer.future;
+  }
+
+  String _mapPhoneAuthError(FirebaseAuthException e) {
+    final message = (e.message ?? '').toLowerCase();
+
+    if (message.contains('17006') || message.contains('sms unable to be sent until this region enabled')) {
+      return 'SMS OTP is blocked for this region in Firebase. Go to Firebase Console → Authentication → Settings → SMS region policy, and allow India (+91) or your target country.';
+    }
+
+    if (message.contains('operation is not allowed') || message.contains('sign-in provider is disabled')) {
+      return 'Phone Sign-in is disabled. Enable Phone provider in Firebase Console → Authentication → Sign-in method.';
+    }
+
+    switch (e.code) {
+      case 'too-many-requests':
+        return 'Too many OTP attempts from this device. Wait 15–30 minutes or try another device/network.';
+      case 'invalid-phone-number':
+        return 'Invalid phone number format. Enter a valid mobile number.';
+      case 'app-not-authorized':
+        return 'App is not authorized for Firebase Phone Auth. Verify package name and SHA fingerprints in Firebase.';
+      case 'quota-exceeded':
+        return 'SMS quota exceeded for this Firebase project. Try later or upgrade billing plan.';
+      case 'captcha-check-failed':
+        return 'App verification failed. Configure reCAPTCHA Enterprise in Firebase Authentication settings.';
+      default:
+        return e.message ?? 'Phone verification failed. Please try again.';
     }
   }
 
@@ -253,7 +300,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     String employeeName,
     String phoneNumber,
     String verificationId,
-    {bool useDebugFallback = false}
   ) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -261,20 +307,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           phoneNumber: phoneNumber,
           employeeName: employeeName,
           verificationId: verificationId,
-          useDebugFallback: useDebugFallback,
-          onDebugVerified: useDebugFallback
-              ? () => _completeEmployeeLogin(employeeName, phoneNumber)
-              : null,
-          onVerified: (UserCredential credential) async {
+          onVerified: () async {
             // OTP verified, complete employee login
             if (mounted) {
               Navigator.of(context).pop();
             }
             await _completeEmployeeLogin(employeeName, phoneNumber);
           },
-          onResendOtp: () async {
-            // Resend OTP
-            await _sendOtp(employeeName, phoneNumber);
+          onResendOtp: () {
+            return _requestOtp(
+              employeeName: employeeName,
+              phoneNumber: phoneNumber,
+            );
           },
         ),
       ),

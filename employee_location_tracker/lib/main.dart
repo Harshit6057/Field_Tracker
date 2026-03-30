@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -52,23 +51,6 @@ Future<void> main() async {
             .timeout(const Duration(seconds: 12));
       } catch (_) {
         // Keep app startup resilient when Firebase Auth is not configured yet.
-      }
-
-      // Ensure admin login always has a default password in Firestore.
-      try {
-        final adminConfigRef = FirebaseFirestore.instance
-            .collection('app_config')
-            .doc('admin_security');
-        final adminConfig = await adminConfigRef.get();
-        final currentPassword = adminConfig.data()?['adminPassword'] as String?;
-        if (!adminConfig.exists || currentPassword == null || currentPassword.isEmpty) {
-          await adminConfigRef.set({
-            'adminPassword': 'admin123',
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
-      } catch (_) {
-        // Avoid blocking app startup if admin config bootstrap fails.
       }
     } catch (error) {
       bootstrapError = error.toString();

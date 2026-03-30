@@ -10,7 +10,10 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../models/route_point.dart';
 import '../models/chat_message.dart';
+import '../models/employee_status.dart';
+import '../models/tracking_alert.dart';
 import '../models/visit_evidence.dart';
+import '../models/work_zone.dart';
 import '../providers/session_provider.dart';
 import '../providers/tracking_provider.dart';
 import 'chat_screen.dart';
@@ -46,7 +49,11 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
 
     final routeAsync = ref.watch(employeeRouteProvider(employeeId));
     final employeeStatusAsync = ref.watch(employeeStatusProvider(employeeId));
-  final visitEvidenceAsync = ref.watch(employeeVisitEvidenceProvider(employeeId));
+    final visitEvidenceAsync = ref.watch(employeeVisitEvidenceProvider(employeeId));
+    final zonesAsync = ref.watch(workZonesProvider);
+    final geofenceAlertsAsync = ref.watch(
+      employeeTrackingAlertsProvider(employeeId),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -186,6 +193,13 @@ class _EmployeeDashboardScreenState extends ConsumerState<EmployeeDashboardScree
               ),
             ),
             const SizedBox(height: 12),
+            _EmployeeGeofencingPanel(
+              employeeId: employeeId,
+              employeeStatusAsync: employeeStatusAsync,
+              zonesAsync: zonesAsync,
+              alertsAsync: geofenceAlertsAsync,
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               height: 240,
               child: routeAsync.when(
@@ -283,6 +297,128 @@ class _StatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _EmployeeGeofencingPanel extends StatelessWidget {
+  const _EmployeeGeofencingPanel({
+    required this.employeeId,
+    required this.employeeStatusAsync,
+    required this.zonesAsync,
+    required this.alertsAsync,
+  });
+
+  final String employeeId;
+  final AsyncValue<EmployeeStatus?> employeeStatusAsync;
+  final AsyncValue<List<WorkZone>> zonesAsync;
+  final AsyncValue<List<TrackingAlert>> alertsAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Geofencing',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            zonesAsync.when(
+              loading: () => const Text('Loading assigned work zones...'),
+              error: (error, _) => Text('Failed to load zones: $error'),
+              data: (zones) {
+                final assignedZones = zones
+                    .where(
+                      (zone) =>
+                          zone.assignedEmployeeIds.isEmpty ||
+                          zone.assignedEmployeeIds.contains(employeeId),
+                    )
+                    .toList(growable: false);
+
+                if (assignedZones.isEmpty) {
+                  return const Text('No work zones assigned to you.');
+                }
+
+                final status = employeeStatusAsync.asData?.value;
+                final latitude = status?.latitude;
+                final longitude = status?.longitude;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...assignedZones.map((zone) {
+                      String stateText = 'Location unavailable';
+                      Color color = Colors.blueGrey;
+
+                      if (latitude != null && longitude != null) {
+                        final distance = Geolocator.distanceBetween(
+                          latitude,
+                          longitude,
+                          zone.centerLatitude,
+                          zone.centerLongitude,
+                        );
+                        final inside = distance <= zone.radiusMeters;
+                        stateText = inside
+                            ? 'Inside zone'
+                            : 'Outside by ${distance.toStringAsFixed(0)} m';
+                        color = inside ? Colors.green : Colors.orange;
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${zone.name} (${zone.radiusMeters.toStringAsFixed(0)} m)',
+                              ),
+                            ),
+                            _StatusPill(label: stateText, color: color),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Recent Geofence Alerts',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            alertsAsync.when(
+              loading: () => const Text('Loading alerts...'),
+              error: (error, _) => Text('Failed to load alerts: $error'),
+              data: (alerts) {
+                if (alerts.isEmpty) {
+                  return const Text('No geofence alerts yet.');
+                }
+                final topAlerts = alerts.take(5).toList(growable: false);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: topAlerts
+                      .map(
+                        (alert) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            '${alert.title} • ${DateFormat('dd MMM, hh:mm a').format(alert.timestamp)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -674,7 +810,7 @@ class _VisitEvidenceCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${item.typeLabel} Visit • ${DateFormat('dd MMM, HH:mm').format(item.timestamp)}',
+              '${item.typeLabel} Visit • ${DateFormat('dd MMM, hh:mm a').format(item.timestamp)}',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),

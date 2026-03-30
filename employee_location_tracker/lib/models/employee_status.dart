@@ -12,6 +12,8 @@ class EmployeeStatus {
     this.activeShiftId,
     this.checkInTime,
     this.checkOutTime,
+      this.department = 'Unassigned',
+      this.team = 'General',
   });
 
   final String employeeId;
@@ -26,6 +28,8 @@ class EmployeeStatus {
   final String? activeShiftId;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
+    final String department;
+    final String team;
 
   EmployeeStatus copyWith({
     String? employeeId,
@@ -40,6 +44,8 @@ class EmployeeStatus {
     String? activeShiftId,
     DateTime? checkInTime,
     DateTime? checkOutTime,
+      String? department,
+      String? team,
   }) {
     return EmployeeStatus(
       employeeId: employeeId ?? this.employeeId,
@@ -54,6 +60,8 @@ class EmployeeStatus {
       activeShiftId: activeShiftId ?? this.activeShiftId,
       checkInTime: checkInTime ?? this.checkInTime,
       checkOutTime: checkOutTime ?? this.checkOutTime,
+        department: department ?? this.department,
+        team: team ?? this.team,
     );
   }
 }

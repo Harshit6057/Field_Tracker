@@ -11,6 +11,7 @@ import '../models/visit_evidence.dart';
 import '../providers/session_provider.dart';
 import '../providers/tracking_provider.dart';
 import 'chat_screen.dart';
+import 'location_tracking_dashboard_screen.dart';
 import 'tracker_map_widget.dart';
 import '../widgets/location_name_text.dart';
 
@@ -33,6 +34,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       appBar: AppBar(
         title: const Text('Admin Control Room'),
         actions: [
+            IconButton(
+              tooltip: 'Location Tracking',
+              icon: const Icon(Icons.location_on),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LocationTrackingDashboardScreen()),
+              ),
+            ),
           IconButton(
             tooltip: 'Logout',
             onPressed: () => ref.read(sessionProvider.notifier).logout(),
@@ -160,7 +169,7 @@ class _EmployeeList extends StatelessWidget {
             onTap: () => onSelect(employee.employeeId),
             title: Text(employee.employeeName),
             subtitle: Text(
-              '${employee.phoneNumber ?? 'No phone'} • Last seen ${DateFormat.Hm().format(employee.lastSeen)}',
+              '${employee.phoneNumber ?? 'No phone'} • Last seen ${DateFormat('hh:mm a').format(employee.lastSeen)}',
             ),
             trailing: SizedBox(
               width: 170,
@@ -295,15 +304,15 @@ class _AdminMapState extends State<_AdminMap> {
                     color: Colors.brown,
                   ),
                   _Badge(
-                    label: 'LAST: ${DateFormat('dd MMM, HH:mm').format(selectedEmployee.lastSeen)}',
+                    label: 'LAST: ${DateFormat('dd MMM, hh:mm a').format(selectedEmployee.lastSeen)}',
                     color: Colors.black54,
                   ),
                   _Badge(
-                    label: 'CHECK-IN: ${selectedEmployee.checkInTime != null ? DateFormat('HH:mm').format(selectedEmployee.checkInTime!) : '--'}',
+                    label: 'CHECK-IN: ${selectedEmployee.checkInTime != null ? DateFormat('hh:mm a').format(selectedEmployee.checkInTime!) : '--'}',
                     color: Colors.indigo,
                   ),
                   _Badge(
-                    label: 'CHECK-OUT: ${selectedEmployee.checkOutTime != null ? DateFormat('HH:mm').format(selectedEmployee.checkOutTime!) : '--'}',
+                    label: 'CHECK-OUT: ${selectedEmployee.checkOutTime != null ? DateFormat('hh:mm a').format(selectedEmployee.checkOutTime!) : '--'}',
                     color: Colors.teal,
                   ),
                 ],
@@ -336,7 +345,7 @@ class _AdminMapState extends State<_AdminMap> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${DateFormat('HH:mm:ss').format(point.timestamp)}  ',
+                          '${DateFormat('hh:mm:ss a').format(point.timestamp)}  ',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Expanded(
@@ -444,7 +453,7 @@ class _AdminEvidenceCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${item.typeLabel} • ${DateFormat('dd MMM, HH:mm').format(item.timestamp)}',
+              '${item.typeLabel} • ${DateFormat('dd MMM, hh:mm a').format(item.timestamp)}',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),

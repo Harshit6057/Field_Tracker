@@ -7,187 +7,236 @@ import '../models/app_user.dart';
 import '../models/chat_message.dart';
 import '../models/employee_status.dart';
 import '../models/route_point.dart';
+import '../models/tracking_alert.dart';
+import '../models/tracking_analytics.dart';
 import '../models/visit_evidence.dart';
+import '../models/work_zone.dart';
 import '../repositories/firebase_tracking_repository.dart';
 import '../repositories/mock_tracking_repository.dart';
 import '../repositories/tracking_repository.dart';
 import '../services/device_tracking_service.dart';
+import '../services/tracking_export_service.dart';
 import 'session_provider.dart';
 
 class EmployeeTrackingState {
-	const EmployeeTrackingState({
-		this.isCheckedIn = false,
-		this.isOnline = false,
-		this.isLoading = false,
-		this.error,
-	});
+  const EmployeeTrackingState({
+    this.isCheckedIn = false,
+    this.isOnline = false,
+    this.isLoading = false,
+    this.error,
+  });
 
-	final bool isCheckedIn;
-	final bool isOnline;
-	final bool isLoading;
-	final String? error;
+  final bool isCheckedIn;
+  final bool isOnline;
+  final bool isLoading;
+  final String? error;
 
-	EmployeeTrackingState copyWith({
-		bool? isCheckedIn,
-		bool? isOnline,
-		bool? isLoading,
-		String? error,
-	}) {
-		return EmployeeTrackingState(
-			isCheckedIn: isCheckedIn ?? this.isCheckedIn,
-			isOnline: isOnline ?? this.isOnline,
-			isLoading: isLoading ?? this.isLoading,
-			error: error,
-		);
-	}
+  EmployeeTrackingState copyWith({
+    bool? isCheckedIn,
+    bool? isOnline,
+    bool? isLoading,
+    String? error,
+  }) {
+    return EmployeeTrackingState(
+      isCheckedIn: isCheckedIn ?? this.isCheckedIn,
+      isOnline: isOnline ?? this.isOnline,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
 }
 
 class TrackingController extends StateNotifier<EmployeeTrackingState> {
-	TrackingController(this.ref)
-			: _repository = ref.read(trackingRepositoryProvider),
-				_deviceTracking = DeviceTrackingService(),
-				super(const EmployeeTrackingState()) {
-		ref.listen<SessionState>(sessionProvider, (previous, next) {
-			_syncWithSession(next);
-		});
-		_syncWithSession(ref.read(sessionProvider));
-	}
+  TrackingController(this.ref)
+    : _repository = ref.read(trackingRepositoryProvider),
+      _deviceTracking = DeviceTrackingService(),
+      super(const EmployeeTrackingState()) {
+    ref.listen<SessionState>(sessionProvider, (previous, next) {
+      _syncWithSession(next);
+    });
+    _syncWithSession(ref.read(sessionProvider));
+  }
 
-	final Ref ref;
-	final TrackingRepository _repository;
-	final DeviceTrackingService _deviceTracking;
+  final Ref ref;
+  final TrackingRepository _repository;
+  final DeviceTrackingService _deviceTracking;
 
-	String? _currentEmployeeId;
+  String? _currentEmployeeId;
 
-	Future<void> _syncWithSession(SessionState session) async {
-		if (session.role != UserRole.employee || session.employeeId == null) {
-			await _deviceTracking.stop();
-			_currentEmployeeId = null;
-			state = const EmployeeTrackingState();
-			return;
-		}
+  Future<void> _syncWithSession(SessionState session) async {
+    if (session.role != UserRole.employee || session.employeeId == null) {
+      await _deviceTracking.stop();
+      _currentEmployeeId = null;
+      state = const EmployeeTrackingState();
+      return;
+    }
 
-		_currentEmployeeId = session.employeeId;
-		final employee = await _repository.getEmployee(session.employeeId!);
-		if (employee != null) {
-			state = state.copyWith(
-				isCheckedIn: employee.isCheckedIn,
-				isOnline: employee.isOnline,
-			);
-			if (employee.isCheckedIn) {
-				await _startTracking();
-			}
-		}
-	}
+    _currentEmployeeId = session.employeeId;
+    final employee = await _repository.getEmployee(session.employeeId!);
+    if (employee != null) {
+      state = state.copyWith(
+        isCheckedIn: employee.isCheckedIn,
+        isOnline: employee.isOnline,
+      );
+      if (employee.isCheckedIn) {
+        await _startTracking();
+      }
+    }
+  }
 
-	Future<void> checkIn() async {
-		final employeeId = _currentEmployeeId;
-		if (employeeId == null) return;
+  Future<void> checkIn() async {
+    final employeeId = _currentEmployeeId;
+    if (employeeId == null) return;
 
-		state = state.copyWith(isLoading: true, error: null);
-		try {
-			await _repository.checkIn(
-				employeeId: employeeId,
-			);
-			state = state.copyWith(isCheckedIn: true, isLoading: false);
-			await _startTracking();
-		} catch (error) {
-			state = state.copyWith(
-				isLoading: false,
-				error: error.toString(),
-			);
-		}
-	}
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repository.checkIn(employeeId: employeeId);
+      state = state.copyWith(isCheckedIn: true, isLoading: false);
+      await _startTracking();
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
+    }
+  }
 
-	Future<void> checkOut() async {
-		final employeeId = _currentEmployeeId;
-		if (employeeId == null) return;
+  Future<void> checkOut() async {
+    final employeeId = _currentEmployeeId;
+    if (employeeId == null) return;
 
-		state = state.copyWith(isLoading: true, error: null);
-		try {
-			await _deviceTracking.stop();
-			await _repository.checkOut(employeeId: employeeId);
-			state = state.copyWith(
-				isCheckedIn: false,
-				isLoading: false,
-				isOnline: false,
-			);
-		} catch (error) {
-			state = state.copyWith(
-				isLoading: false,
-				error: error.toString(),
-			);
-		}
-	}
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _deviceTracking.stop();
+      await _repository.checkOut(employeeId: employeeId);
+      state = state.copyWith(
+        isCheckedIn: false,
+        isLoading: false,
+        isOnline: false,
+      );
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
+    }
+  }
 
-	Future<void> _startTracking() async {
-		final employeeId = _currentEmployeeId;
-		if (employeeId == null) return;
+  Future<void> _startTracking() async {
+    final employeeId = _currentEmployeeId;
+    if (employeeId == null) return;
 
-		try {
-			await _deviceTracking.start(
-				onLocationPoint: (Position position) async {
-					await _repository.updateLocation(
-						employeeId: employeeId,
-						latitude: position.latitude,
-						longitude: position.longitude,
-						speedMetersPerSecond: position.speed,
-						accuracyMeters: position.accuracy,
-						isOnline: state.isOnline,
-					);
-				},
-				onConnectivityState: (bool isOnline) async {
-					state = state.copyWith(isOnline: isOnline);
-					await _repository.updatePresence(
-						employeeId: employeeId,
-						isOnline: isOnline,
-					);
-				},
-			);
-		} catch (error) {
-			state = state.copyWith(error: error.toString());
-		}
-	}
+    try {
+      await _deviceTracking.start(
+        onLocationPoint: (Position position) async {
+          await _repository.updateLocation(
+            employeeId: employeeId,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            speedMetersPerSecond: position.speed,
+            accuracyMeters: position.accuracy,
+            isOnline: state.isOnline,
+          );
+        },
+        onConnectivityState: (bool isOnline) async {
+          state = state.copyWith(isOnline: isOnline);
+          await _repository.updatePresence(
+            employeeId: employeeId,
+            isOnline: isOnline,
+          );
+        },
+      );
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
 }
 
 final trackingRepositoryProvider = Provider<TrackingRepository>((ref) {
-	if (AppConfig.useMockBackend) {
-		return MockTrackingRepository();
-	}
+  if (AppConfig.useMockBackend) {
+    return MockTrackingRepository();
+  }
 
-	return FirebaseTrackingRepository(FirebaseFirestore.instance);
+  return FirebaseTrackingRepository(FirebaseFirestore.instance);
 });
 
 final trackingControllerProvider =
-		StateNotifierProvider<TrackingController, EmployeeTrackingState>((ref) {
-	return TrackingController(ref);
-});
+    StateNotifierProvider<TrackingController, EmployeeTrackingState>((ref) {
+      return TrackingController(ref);
+    });
 
 final employeeStatusesProvider = StreamProvider<List<EmployeeStatus>>((ref) {
-	final repository = ref.watch(trackingRepositoryProvider);
-	return repository.watchEmployees();
+  final repository = ref.watch(trackingRepositoryProvider);
+  return repository.watchEmployees();
 });
 
-final employeeStatusProvider =
-		StreamProvider.family<EmployeeStatus?, String>((ref, employeeId) {
-	final repository = ref.watch(trackingRepositoryProvider);
-	return repository.watchEmployee(employeeId);
+final employeeStatusProvider = StreamProvider.family<EmployeeStatus?, String>((
+  ref,
+  employeeId,
+) {
+  final repository = ref.watch(trackingRepositoryProvider);
+  return repository.watchEmployee(employeeId);
 });
 
-final employeeRouteProvider =
-		StreamProvider.family<List<RoutePoint>, String>((ref, employeeId) {
-	final repository = ref.watch(trackingRepositoryProvider);
-	return repository.watchTodayRoute(employeeId);
+final employeeRouteProvider = StreamProvider.family<List<RoutePoint>, String>((
+  ref,
+  employeeId,
+) {
+  final repository = ref.watch(trackingRepositoryProvider);
+  return repository.watchTodayRoute(employeeId);
 });
 
 final employeeVisitEvidenceProvider =
-		StreamProvider.family<List<VisitEvidence>, String>((ref, employeeId) {
-	final repository = ref.watch(trackingRepositoryProvider);
-	return repository.watchVisitEvidence(employeeId);
-});
+    StreamProvider.family<List<VisitEvidence>, String>((ref, employeeId) {
+      final repository = ref.watch(trackingRepositoryProvider);
+      return repository.watchVisitEvidence(employeeId);
+    });
 
 final employeeChatMessagesProvider =
-		StreamProvider.family<List<ChatMessage>, String>((ref, employeeId) {
-	final repository = ref.watch(trackingRepositoryProvider);
-	return repository.watchChatMessages(employeeId);
+    StreamProvider.family<List<ChatMessage>, String>((ref, employeeId) {
+      final repository = ref.watch(trackingRepositoryProvider);
+      return repository.watchChatMessages(employeeId);
+    });
+
+final workZonesProvider = StreamProvider<List<WorkZone>>((ref) {
+  final repository = ref.watch(trackingRepositoryProvider);
+  return repository.watchWorkZones();
+});
+
+final trackingAlertsProvider = StreamProvider<List<TrackingAlert>>((ref) {
+  final repository = ref.watch(trackingRepositoryProvider);
+  return repository.watchTrackingAlerts(limit: 200);
+});
+
+final employeeTrackingAlertsProvider =
+    StreamProvider.family<List<TrackingAlert>, String>((ref, employeeId) {
+      final repository = ref.watch(trackingRepositoryProvider);
+      return repository.watchTrackingAlerts(employeeId: employeeId, limit: 200);
+    });
+
+class DailyReportRequest {
+  const DailyReportRequest({required this.employeeId, required this.date});
+
+  final String employeeId;
+  final DateTime date;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is DailyReportRequest &&
+        other.employeeId == employeeId &&
+        other.date.year == date.year &&
+        other.date.month == date.month &&
+        other.date.day == date.day;
+  }
+
+  @override
+  int get hashCode => Object.hash(employeeId, date.year, date.month, date.day);
+}
+
+final dailyTrackingReportProvider =
+    FutureProvider.family<DailyTrackingReport, DailyReportRequest>((ref, req) {
+      final repository = ref.watch(trackingRepositoryProvider);
+      return repository.buildDailyTrackingReport(
+        employeeId: req.employeeId,
+        date: req.date,
+      );
+    });
+
+final trackingExportServiceProvider = Provider<TrackingExportService>((ref) {
+  return TrackingExportService();
 });
